@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>ברח מהמכשול</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: sans-serif;
+      background: #f2f2f2;
+      position: relative;
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+
+    h1 {
+      margin-top: 20px;
+    }
+
+    #gameArea {
+      position: relative;
+      width: 420px;
+      height: 600px;
+      background: #e0f7fa;
+      margin-top: 20px;
+      overflow: hidden;
+      border: 2px solid #333;
+    }
+
+    #player, #obstacle, #obstacle2 {
+      width: 60px;
+      height: 60px;
+      position: absolute;
+    }
+
+    #player {
+      background: #2196f3;
+      bottom: 0;
+      left: 180px;
+    }
+
+    #obstacle, #obstacle2 {
+      background: red;
+      top: 0;
+      left: 180px;
+    }
+
+    #status {
+      font-weight: bold;
+      color: red;
+      margin: 10px;
+    }
+
+    #restartBtn, #startBtn, #pauseBtn {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #restartBtn {
+      background-color: #4caf50;
+      color: white;
+      display: none;
+      position: absolute;
+      top: 60%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #startBtn {
+      background-color: #008CBA;
+      color: white;
+      position: absolute;
+      top: 60%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+
+    #pauseBtn {
+      background-color: #f44336;
+      color: white;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+    }
+
+    #timer, #highScore {
+      font-size: 18px;
+      font-weight: bold;
+      color: #2196f3;
+      position: absolute;
+      top: 10px;
+    }
+
+    #timer {
+      right: 20px;
+    }
+
+    #highScore {
+      left: 20px;
+    }
+
+    #difficultySelect {
+      margin-top: 10px;
+      font-size: 16px;
+      padding: 5px;
+    }
+
+    #instructions {
+      position: absolute;
+      right: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 200px;
+      background: #ffffff;
+      border: 2px solid #2196f3;
+      padding: 15px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+      direction: rtl;
+      text-align: right;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h1>ברח מהמכשול!</h1>
+
+  <select id="difficultySelect">
+    <option value="easy">קל</option>
+    <option value="medium">בינוני</option>
+    <option value="hard">קשה</option>
+    <option value="impossible">בלתי אפשרי</option>
+  </select>
+
+  <div id="gameArea">
+    <div id="player"></div>
+    <div id="obstacle"></div>
+    <div id="obstacle2"></div>
+    <div id="timer">זמן: 0</div>
+    <div id="highScore">שיא: 0</div>
+  </div>
+
+  <p id="status"></p>
+
+  <button id="startBtn">התחל משחק</button>
+  <button id="pauseBtn">הפסיק משחק</button>
+  <button id="restartBtn">שחק שוב</button>
+
+  <div id="instructions">
+    <h3>הוראות משחק</h3>
+    <ul>
+      <li>השתמש בחצים ◀️ ▶️ כדי לזוז.</li>
+      <li>הימנע מהמכשולים האדומים.</li>
+      <li>בחר רמת קושי מהתפריט.</li>
+      <li>נסה לשרוד כמה שיותר זמן!</li>
+    </ul>
+  </div>
+
+  <audio id="gameMusic" loop>
+    <source src="https://www.bensound.com/bensound-music/bensound-energy.mp3" type="audio/mpeg">
+    הדפדפן שלך לא תומך בהשמעת אודיו.
+  </audio>
+
+  <script>
+    const player = document.getElementById("player");
+    const obstacle = document.getElementById("obstacle");
+    const obstacle2 = document.getElementById("obstacle2");
+    const status = document.getElementById("status");
+    const restartBtn = document.getElementById("restartBtn");
+    const startBtn = document.getElementById("startBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const timerDisplay = document.getElementById("timer");
+    const highScoreDisplay = document.getElementById("highScore");
+    const difficultySelect = document.getElementById("difficultySelect");
+    const gameMusic = document.getElementById("gameMusic");
+
+    let playerLeft = 180;
+    let obstacleTop = 0;
+    let obstacleLeft = 0;
+    let obstacle2Top = 0;
+    let obstacle2Left = 120;
+    let gameOver = false;
+    let gamePaused = false;
+    let speed = 4;
+    let time = 0;
+    let timerInterval;
+    let currentDifficulty = "easy";
+
+    const highScores = {
+      easy: 0,
+      medium: 0,
+      hard: 0,
+      impossible: 0
+    };
+
+    document.addEventListener("keydown", (e) => {
+      if (gameOver || gamePaused) return;
+      if (e.key === "ArrowLeft" && playerLeft >= 60) {
+        playerLeft -= 60;
+      } else if (e.key === "ArrowRight" && playerLeft <= 300) {
+        playerLeft += 60;
+      }
+      player.style.left = playerLeft + "px";
+    });
+
+    difficultySelect.addEventListener("change", () => {
+      currentDifficulty = difficultySelect.value;
+      updateHighScore();
+    });
+
+    function isColliding() {
+      const playerRect = player.getBoundingClientRect();
+      const obstacleRect = obstacle.getBoundingClientRect();
+      const buffer = 10;
+
+      let collide = (
+        playerRect.left + buffer < obstacleRect.right &&
+        playerRect.right - buffer > obstacleRect.left &&
+        playerRect.top + buffer < obstacleRect.bottom &&
+        playerRect.bottom - buffer > obstacleRect.top
+      );
+
+      if (currentDifficulty === "impossible") {
+        const obstacle2Rect = obstacle2.getBoundingClientRect();
+        collide = collide || (
+          playerRect.left + buffer < obstacle2Rect.right &&
+          playerRect.right - buffer > obstacle2Rect.left &&
+          playerRect.top + buffer < obstacle2Rect.bottom &&
+          playerRect.bottom - buffer > obstacle2Rect.top
+        );
+      }
+
+      return collide;
+    }
+
+    function fall() {
+      if (gameOver || gamePaused) return;
+
+      obstacleTop += speed;
+      obstacle.style.top = obstacleTop + "px";
+
+      if (currentDifficulty === "impossible") {
+        obstacle2Top += speed;
+        obstacle2.style.top = obstacle2Top + "px";
+      }
+
+      if (isColliding()) {
+        gameOver = true;
+        status.textContent = "נפגעת! ❌";
+        clearInterval(timerInterval);
+        restartBtn.style.display = "inline-block";
+        startBtn.style.display = "none";
+        pauseBtn.style.display = "none";
+        gameMusic.pause();
+        updateHighScores();
+        return;
+      }
+
+      if (obstacleTop > 600) resetObstacle();
+      if (currentDifficulty === "impossible" && obstacle2Top > 600) resetObstacle2();
+
+      if (!gameOver && !gamePaused) {
+        requestAnimationFrame(fall);
+      }
+    }
+
+    function resetObstacle() {
+      obstacleTop = 0;
+      obstacleLeft = Math.floor(Math.random() * 7) * 60;
+      obstacle.style.top = obstacleTop + "px";
+      obstacle.style.left = obstacleLeft + "px";
+    }
+
+    function resetObstacle2() {
+      obstacle2Top = 0;
+      obstacle2Left = Math.floor(Math.random() * 7) * 60;
+      obstacle2.style.top = obstacle2Top + "px";
+      obstacle2.style.left = obstacle2Left + "px";
+    }
+
+    function updateTimer() {
+      time++;
+      timerDisplay.textContent = "זמן: " + time;
+    }
+
+    function startGame() {
+      gameOver = false;
+      gamePaused = false;
+      time = 0;
+      playerLeft = 180;
+      player.style.left = playerLeft + "px";
+      resetObstacle();
+      resetObstacle2();
+      status.textContent = "";
+      startBtn.style.display = "none";
+      restartBtn.style.display = "none";
+      pauseBtn.style.display = "inline-block";
+      timerDisplay.textContent = "זמן: 0";
+      gameMusic.play();
+
+      setSpeedByDifficulty();
+      updateHighScore();
+
+      // רק במצב בלתי אפשרי להראות obstacle2
+      obstacle2.style.display = (currentDifficulty === "impossible") ? "block" : "none";
+
+      timerInterval = setInterval(updateTimer, 1000);
+      fall();
+    }
+
+    function pauseGame() {
+      gamePaused = true;
+      status.textContent = "המשחק מושהה";
+      pauseBtn.textContent = "המשך משחק";
+    }
+
+    function resumeGame() {
+      gamePaused = false;
+      status.textContent = "";
+      pauseBtn.textContent = "הפסיק משחק";
+      fall();
+    }
+
+    function restartGame() {
+      startGame();
+    }
+
+    function setSpeedByDifficulty() {
+      if (currentDifficulty === "easy") speed = 7;
+      else if (currentDifficulty === "medium") speed = 9;
+      else if (currentDifficulty === "hard") speed = 11;
+      else if (currentDifficulty === "impossible") speed = 13;
+    }
+
+    function updateHighScores() {
+      if (time > highScores[currentDifficulty]) {
+        highScores[currentDifficulty] = time;
+        updateHighScore();
+      }
+    }
+
+    function updateHighScore() {
+      highScoreDisplay.textContent = "שיא (" + translateDifficulty(currentDifficulty) + "): " + highScores[currentDifficulty];
+    }
+
+    function translateDifficulty(difficulty) {
+      if (difficulty === "easy") return "קל";
+      if (difficulty === "medium") return "בינוני";
+      if (difficulty === "hard") return "קשה";
+      if (difficulty === "impossible") return "בלתי אפשרי";
+    }
+
+    startBtn.addEventListener("click", startGame);
+    pauseBtn.addEventListener("click", () => {
+      if (gamePaused) resumeGame();
+      else pauseGame();
+    });
+    restartBtn.addEventListener("click", restartGame);
+  </script>
+</body>
+</html>
